@@ -223,7 +223,7 @@ const cv = $('#cv');
 const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 1.5 : 2));
 renderer.outputEncoding = THREE.sRGBEncoding; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9fd4ff); scene.fog = new THREE.Fog(0xbfe0ff, 70, 230);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9fd4ff); scene.fog = new THREE.Fog(0xbfe0ff, 90, 340);
 const camera = new THREE.PerspectiveCamera(50, 1, .5, 900);
 const clock = new THREE.Clock();
 scene.add(new THREE.HemisphereLight(0xe8f6ff, 0x4a5878, .6));
@@ -249,7 +249,7 @@ const addCirc = (x, z, r) => obstacles.push({x, z, r});
 })();
 
 /* ---------------- 도시 배치: 도로 6줄 × 6줄, 블록 5 × 5 ---------------- */
-const ROADS = [-70, -42, -14, 14, 42, 70], RW = 8, BLOCKS = [-56, -28, 0, 28, 56], LIMIT = 76;
+const ROADS = [-70, -42, -14, 14, 42, 70], RW = 8, BLOCKS = [-56, -28, 0, 28, 56], LIMIT = 152, CITY = 74;   /* 가운데 도시(±74) + 바깥 교외 공원(±152): 예전보다 가로·세로 2배 */
 const roadTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#3a4258'; g.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++){ g.fillStyle = `rgba(255,255,255,${Math.random() * .05})`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); } });
 roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(40, 40);
 const ground = mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({map:roadTex, roughness:.9}), false); ground.rotation.x = -Math.PI / 2; scene.add(ground);
@@ -410,8 +410,47 @@ STATIONS.forEach(buildLandmark);
   })); }
 /* 가로등 */
 ROADS.forEach(r => { for (let t = -66; t <= 66; t += 14){ if (Math.abs(t) < 9 && Math.abs(r) < 15) continue; lamp(t, r - 4.6); lamp(r + 4.6, t); } });
-/* 도시 바깥 스카이라인 (들어갈 수 없는 곳) */
-for (let i = 0; i < 46; i++){ const a = i / 46 * Math.PI * 2, R = rnd(96, 120), w = rnd(8, 16), h = rnd(8, 18), x = Math.cos(a) * R, z = Math.sin(a) * R; const b = box(w, h, w, BMATS[i % BMATS.length]); b.position.set(x, h / 2, z); b.castShadow = false; scene.add(b); }
+/* ---------------- 도시 교외: 큰 공원 (잔디·산책로·호수·꽃밭·숲, 멀리 언덕) ---------------- */
+const PONDS = [[0, -113, 15], [0, 113, 15], [-113, 0, 15], [113, 0, 15]], GARDENS = [[-112, -112], [112, -112], [-112, 112], [112, 112]];
+const PATHS = [];   /* [x0,z0,x1,z1] 산책로(모래색) */
+{ const grassTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#7cc96a'; g.fillRect(0, 0, w, h); for (let i = 0; i < 700; i++){ g.fillStyle = Math.random() < .5 ? 'rgba(60,140,60,.35)' : 'rgba(170,230,120,.35)'; g.fillRect(Math.random() * w, Math.random() * h, 2, 3); } });
+  grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping; const gm = new THREE.MeshStandardMaterial({map:grassTex, roughness:.95});
+  const slab = (x0, z0, x1, z1) => { const w = x1 - x0, d = z1 - z0, t = grassTex.clone(); t.needsUpdate = true; t.repeat.set(w / 8, d / 8); const m = mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({map:t, roughness:.95}), false); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, .03, (z0 + z1) / 2); scene.add(m); };
+  slab(-320, -320, 320, -CITY); slab(-320, CITY, 320, 320); slab(-320, -CITY, -CITY, CITY); slab(CITY, -CITY, 320, CITY);
+  // 산책로: 도시 도로가 공원으로 이어짐 + 공원을 한 바퀴 도는 길
+  const pathM = new THREE.MeshStandardMaterial({color:0xe9d8ad, roughness:.95});
+  const path = (x0, z0, x1, z1, w) => { const L = Math.hypot(x1 - x0, z1 - z0), m = mesh(new THREE.PlaneGeometry(w, L), pathM, false); m.rotation.x = -Math.PI / 2; m.rotation.z = -Math.atan2(x1 - x0, z1 - z0); m.position.set((x0 + x1) / 2, .05, (z0 + z1) / 2); scene.add(m); PATHS.push([x0, z0, x1, z1]); };
+  [-42, -14, 14, 42].forEach(r => { path(r, -CITY, r, -140, 5); path(r, CITY, r, 140, 5); path(-CITY, r, -140, r, 5); path(CITY, r, 140, r, 5); });
+  path(-140, -140, 140, -140, 6); path(-140, 140, 140, 140, 6); path(-140, -140, -140, 140, 6); path(140, -140, 140, 140, 6);
+  // 호수 (물결 반짝임) + 오리배
+  const waterM = new THREE.MeshStandardMaterial({color:0x4fb6ea, roughness:.15, metalness:.25, emissive:0x1a6aa0, emissiveIntensity:.15});
+  PONDS.forEach(([x, z, r], i) => { const shore = mesh(new THREE.CircleGeometry(r + 2, 40), new THREE.MeshStandardMaterial({color:0xe9d8ad, roughness:.95}), false); shore.rotation.x = -Math.PI / 2; shore.position.set(x, .06, z); scene.add(shore);
+    const wtr = mesh(new THREE.CircleGeometry(r, 40), waterM, false); wtr.rotation.x = -Math.PI / 2; wtr.position.set(x, .09, z); scene.add(wtr);
+    const boat = new THREE.Group(); scene.add(boat); const hull = mesh(new THREE.SphereGeometry(1.4, 12, 8), mat(0xffffff)); hull.scale.set(1, .45, 1.6); boat.add(hull); const head = mesh(new THREE.SphereGeometry(.55, 10, 8), mat(0xffd23f)); head.position.set(0, 1.1, 1.3); boat.add(head); const bk = mesh(new THREE.ConeGeometry(.2, .5, 8), mat(0xff8a3d)); bk.rotation.x = Math.PI / 2; bk.position.set(0, 1.05, 1.95); boat.add(bk);
+    anims.push((dt, el) => { const a = el * .15 + i * 1.7; boat.position.set(x + Math.cos(a) * r * .55, .3 + Math.sin(el * 2 + i) * .08, z + Math.sin(a) * r * .55); boat.rotation.y = -a; }); });
+  waterM.userData.t = 0; anims.push((dt, el) => { waterM.emissiveIntensity = .12 + .06 * Math.sin(el * 1.5); });
+  // 꽃밭 정원 (네 모퉁이) + 가운데 정자
+  const flowerCols = [0xff5fa2, 0xffd23f, 0xff8a3d, 0xffffff, 0xb07cff];
+  const flowers = flowerCols.map(c => new THREE.InstancedMesh(new THREE.SphereGeometry(.35, 6, 5), mat(c, {roughness:.5}), 260)); const fc = flowerCols.map(() => 0);
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S1 = new THREE.Vector3(1, 1, 1), P = new THREE.Vector3();
+  GARDENS.forEach(([gx, gz]) => { const bed = mesh(new THREE.CircleGeometry(12, 32), mat(0x6b4a2e, {roughness:1}), false); bed.rotation.x = -Math.PI / 2; bed.position.set(gx, .07, gz); scene.add(bed);
+    for (let i = 0; i < 230; i++){ const a = Math.random() * 6.283, rr = 3 + Math.sqrt(Math.random()) * 8.5, k = (Math.floor(a / 6.283 * 10)) % 5; P.set(gx + Math.cos(a) * rr, .45, gz + Math.sin(a) * rr); if (fc[k] < 260) flowers[k].setMatrixAt(fc[k]++, M.compose(P, Q, S1)); }
+    const roof = mesh(new THREE.ConeGeometry(3.4, 2, 6), mat(0xd9534f)); roof.position.set(gx, 4.2, gz); scene.add(roof); for (let k = 0; k < 6; k++){ const a = k / 6 * 6.283, c = cyl(.15, .15, 3.2, mat(0xf2f5fa)); c.position.set(gx + Math.cos(a) * 2.6, 1.6, gz + Math.sin(a) * 2.6); scene.add(c); } addCirc(gx, gz, 2.8); });
+  flowers.forEach((f, k) => { f.count = fc[k]; scene.add(f); });
+  // 숲 (나무 수백 그루, 산책로·호수·정원은 비움)
+  const nearPath = (x, z, pad) => PATHS.some(([x0, z0, x1, z1]) => { const dx = x1 - x0, dz = z1 - z0, t = Math.max(0, Math.min(1, ((x - x0) * dx + (z - z0) * dz) / (dx * dx + dz * dz))); return Math.hypot(x - x0 - dx * t, z - z0 - dz * t) < pad; });
+  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(.25, .35, 2.2, 6), mat(0x8a6040), 700), crownCols = [0x5ccf7a, 0x3fae63, 0x7be08f, 0x2f8f55];
+  const crowns = crownCols.map((c, k) => new THREE.InstancedMesh(k === 3 ? new THREE.ConeGeometry(1.8, 4.2, 7) : new THREE.IcosahedronGeometry(1.8, 0), mat(c), 260)); const cc = crownCols.map(() => 0); let nt = 0;
+  trunks.castShadow = true; crowns.forEach(c => c.castShadow = true);
+  for (let i = 0; i < 4000 && nt < 700; i++){ const x = rnd(-150, 150), z = rnd(-150, 150); if (Math.max(Math.abs(x), Math.abs(z)) < CITY + 4) continue; if (nearPath(x, z, 5)) continue;
+    if (PONDS.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r + 4)) continue; if (GARDENS.some(([gx, gz]) => Math.hypot(x - gx, z - gz) < 15)) continue; if (Math.random() < .35) continue;
+    const sc = rnd(.8, 1.5), k = (Math.random() * 4) | 0; if (cc[k] >= 260) continue; P.set(x, 1.1 * sc, z); S1.setScalar(sc); trunks.setMatrixAt(nt++, M.compose(P, Q, S1)); P.set(x, (k === 3 ? 4 : 3.2) * sc, z); crowns[k].setMatrixAt(cc[k]++, M.compose(P, Q, S1)); }
+  S1.set(1, 1, 1); trunks.count = nt; scene.add(trunks); crowns.forEach((c, k) => { c.count = cc[k]; scene.add(c); });
+  // 벤치·가로등 (산책로 옆)
+  const benchM = mat(0x9a5a28); [-42, -14, 14, 42].forEach(r => [-1, 1].forEach(sg => { for (let t = 90; t <= 130; t += 20){ [[r + 3.6, sg * t], [sg * t, r + 3.6]].forEach(([x, z]) => { const b = box(1.8, .5, .7, benchM); b.position.set(x, .5, z); scene.add(b); }); lamp(r - 3.4, sg * t); } }));
+  // 멀리 둘러싼 언덕 (들어갈 수 없는 곳)
+  for (let i = 0; i < 40; i++){ const a = i / 40 * 6.283 + rnd(-.05, .05), R = rnd(190, 230), h = rnd(18, 42), hl = mesh(new THREE.ConeGeometry(rnd(26, 40), h, 7), mat([0x6fbf73, 0x5aa86a, 0x84cf7f][i % 3], {roughness:1})); hl.position.set(Math.cos(a) * R, h / 2 - 2, Math.sin(a) * R); hl.castShadow = false; scene.add(hl); }
+}
 /* 하늘을 나는 자동차(공중 택시) */
 for (let i = 0; i < 12; i++){ const car = new THREE.Group(); scene.add(car); const body = mesh(new THREE.SphereGeometry(1, 12, 8), mat(neon[i % 5], {metalness:.4, roughness:.3})); body.scale.set(1.1, .55, 2); car.add(body);
   const cab = mesh(new THREE.SphereGeometry(.75, 12, 8), mat(0x9fe7ff, {roughness:.05, metalness:.4, transparent:true, opacity:.85})); cab.position.set(0, .45, -.2); cab.scale.set(1, .7, 1.2); car.add(cab);
@@ -517,7 +556,7 @@ const tapMark = mesh(new THREE.RingGeometry(.5, .7, 24), new THREE.MeshBasicMate
 function collide(p){ const R = .6 * BIG; for (const o of obstacles){ if (o.r !== undefined){ if (o.r < .9) continue;   /* 대형 로봇은 가로등·나무를 넘어감 */ const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), m = o.r + R; if (d < m && d > 1e-4){ p.x = o.x + dx / d * m; p.z = o.z + dz / d * m; } continue; }
     if (p.x > o.x0 - R && p.x < o.x1 + R && p.z > o.z0 - R && p.z < o.z1 + R){ const pl = p.x - (o.x0 - R), pr = (o.x1 + R) - p.x, pu = p.z - (o.z0 - R), pd = (o.z1 + R) - p.z, m = Math.min(pl, pr, pu, pd);
       if (m === pl) p.x = o.x0 - R; else if (m === pr) p.x = o.x1 + R; else if (m === pu) p.z = o.z0 - R; else p.z = o.z1 + R; } }
-  if (Math.abs(p.x) > LIMIT || Math.abs(p.z) > LIMIT){ p.x = Math.max(-LIMIT, Math.min(LIMIT, p.x)); p.z = Math.max(-LIMIT, Math.min(LIMIT, p.z)); if (!collide.warn || clock.elapsedTime - collide.warn > 4){ collide.warn = clock.elapsedTime; say('여기는 도시의 끝이에요. 안쪽으로 돌아가요!'); } } }
+  if (Math.abs(p.x) > LIMIT || Math.abs(p.z) > LIMIT){ p.x = Math.max(-LIMIT, Math.min(LIMIT, p.x)); p.z = Math.max(-LIMIT, Math.min(LIMIT, p.z)); if (!collide.warn || clock.elapsedTime - collide.warn > 4){ collide.warn = clock.elapsedTime; say('여기는 공원의 끝이에요. 도시 쪽으로 돌아가요!'); } } }
 
 /* ---------------- 방송국 도착 → 다이얼 돌려 동조 → 문제 → 보물 ---------------- */
 const dial = $('#dial');
@@ -579,10 +618,15 @@ paintVoice(); updScore();
 
 /* ---------------- 미니맵 ---------------- */
 const mini = $('#mini'), mg = mini.getContext('2d');
-function drawMini(){ const W = mini.width, s = W / 170, P = (x, z) => [W / 2 + x * s, W / 2 + z * s];
-  mg.clearRect(0, 0, W, W); mg.fillStyle = '#16253f'; mg.fillRect(0, 0, W, W); mg.fillStyle = '#3a4a6a'; ROADS.forEach(r => { let [x] = P(r, 0); mg.fillRect(x - RW * s / 2, 0, RW * s, W); let [, y] = P(0, r); mg.fillRect(0, y - RW * s / 2, W, RW * s); });
+function drawMini(){ const W = mini.width, s = W / 320, P = (x, z) => [W / 2 + x * s, W / 2 + z * s];
+  mg.clearRect(0, 0, W, W); mg.fillStyle = '#3f8a4a'; mg.fillRect(0, 0, W, W);
+  mg.strokeStyle = '#d9c99a'; mg.lineWidth = 5 * s; PATHS.forEach(([x0, z0, x1, z1]) => { mg.beginPath(); mg.moveTo(...P(x0, z0)); mg.lineTo(...P(x1, z1)); mg.stroke(); });
+  mg.fillStyle = '#4fb6ea'; PONDS.forEach(([x, z, r]) => { mg.beginPath(); mg.arc(...P(x, z), r * s, 0, 7); mg.fill(); });
+  mg.fillStyle = '#ff8ab8'; GARDENS.forEach(([x, z]) => { mg.beginPath(); mg.arc(...P(x, z), 10 * s, 0, 7); mg.fill(); });
+  { const [a, b] = P(-CITY, -CITY); mg.fillStyle = '#16253f'; mg.fillRect(a, b, CITY * 2 * s, CITY * 2 * s); }
+  mg.fillStyle = '#3a4a6a'; ROADS.forEach(r => { let [x, y0] = P(r, -CITY); mg.fillRect(x - RW * s / 2, y0, RW * s, CITY * 2 * s); let [x0, y] = P(-CITY, r); mg.fillRect(x0, y - RW * s / 2, CITY * 2 * s, RW * s); });
   mg.fillStyle = '#ffd23f'; mg.beginPath(); let [vx, vy] = P(0, 0); mg.arc(vx, vy, 7, 0, 7); mg.fill(); mg.fillStyle = '#16253f'; mg.font = '16px sans-serif'; mg.textAlign = 'center'; mg.textBaseline = 'middle'; mg.fillText('★', vx, vy + 1);
-  STATIONS.forEach(st => { const [x, y] = P(st.marker.x, st.marker.z); mg.fillStyle = st.done ? '#4dffa6' : '#' + st.col.toString(16).padStart(6, '0'); mg.beginPath(); mg.arc(x, y, st.done ? 6 : 8, 0, 7); mg.fill(); if (!st.done){ mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.stroke(); } });
+  STATIONS.forEach(st => { const [x, y] = P(st.marker.x, st.marker.z); mg.fillStyle = st.done ? '#4dffa6' : '#' + st.col.toString(16).padStart(6, '0'); mg.beginPath(); mg.arc(x, y, st.done ? 5 : 7, 0, 7); mg.fill(); if (!st.done){ mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.stroke(); } });
   const [rx, ry] = P(robot.pos.x, robot.pos.z); mg.save(); mg.translate(rx, ry); mg.rotate(Math.PI - robot.heading); mg.fillStyle = '#ffffff'; mg.beginPath(); mg.moveTo(0, -11); mg.lineTo(8, 8); mg.lineTo(0, 4); mg.lineTo(-8, 8); mg.closePath(); mg.fill(); mg.restore(); }
 
 /* ---------------- 매 프레임 ---------------- */
