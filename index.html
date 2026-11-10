@@ -222,7 +222,7 @@ const camera = new THREE.PerspectiveCamera(50, 1, .5, 900);
 const clock = new THREE.Clock();
 scene.add(new THREE.HemisphereLight(0xe8f6ff, 0x4a5878, .6));
 const sun = new THREE.DirectionalLight(0xfff1dc, 1.0); sun.castShadow = true; sun.shadow.mapSize.set(TOUCH ? 1024 : 2048, TOUCH ? 1024 : 2048);
-Object.assign(sun.shadow.camera, {left:-40, right:40, top:40, bottom:-40, near:1, far:160}); sun.shadow.bias = -.0005; scene.add(sun); scene.add(sun.target);
+Object.assign(sun.shadow.camera, {left:-60, right:60, top:60, bottom:-60, near:1, far:200}); sun.shadow.bias = -.0005; scene.add(sun); scene.add(sun.target);
 const mat = (c, o) => new THREE.MeshStandardMaterial(Object.assign({color:c, roughness:.6, metalness:.05, flatShading:true}, o || {}));
 const glow = (c, i) => new THREE.MeshStandardMaterial({color:c, emissive:c, emissiveIntensity:i || 1.2, roughness:.4});
 function mesh(g, m, sh){ const o = new THREE.Mesh(g, m); o.castShadow = sh !== false; o.receiveShadow = true; return o; }
@@ -261,11 +261,12 @@ function winTex(base, lit, seed){ return canvasTex(64, 128, (g, w, h) => { g.fil
 const BMATS = [['#f4f8fc', '#7fe8ff'], ['#d9e6ff', '#ffe28a'], ['#ffe3ef', '#9fd9ff'], ['#e6fff4', '#ffd0f0'], ['#2f3e62', '#5ff0ff'], ['#efeafc', '#fff2a8']].map(([b, l], i) => {
   const t = winTex(b, l, 11 + i * 77); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 3); return new THREE.MeshStandardMaterial({map:t, emissiveMap:t, emissive:0xffffff, emissiveIntensity:.32, roughness:.45, metalness:.1}); });
 const neon = [0x38e1ff, 0xff5fa2, 0xffd23f, 0x7c5cff, 0x4dffa6];
+const TOWERS = [];   /* 로봇 앞(카메라 쪽)을 가리는 빌딩은 반투명하게 */
 function tower(x, z, w, d, h, mi){
   const g = new THREE.Group(); g.position.set(x, 0, z); scene.add(g);
-  const b = box(w, h, d, BMATS[mi % BMATS.length]); b.position.y = h / 2; g.add(b);
+  const b = box(w, h, d, BMATS[mi % BMATS.length].clone()); b.material.transparent = true; b.position.y = h / 2; g.add(b); TOWERS.push({g, b, x, z, w, d, fade:1});
   const ring = box(w + .3, .35, d + .3, glow(neon[mi % neon.length], 1.4)); ring.position.y = h * .66; g.add(ring);
-  if (h > 22){ const top = box(w * .6, h * .18, d * .6, BMATS[(mi + 2) % BMATS.length]); top.position.y = h + h * .09; g.add(top);
+  if (h > 8.5){ const top = box(w * .6, h * .18, d * .6, BMATS[(mi + 2) % BMATS.length]); top.position.y = h + h * .09; g.add(top);
     const sp = cyl(.08, .14, 5, mat(0xc8d2e0, {metalness:.6})); sp.position.y = h * 1.18 + 2.5; g.add(sp); const tip = mesh(new THREE.SphereGeometry(.28, 8, 6), glow(0xff3b3b, 2), false); tip.position.y = h * 1.18 + 5.1; g.add(tip);
     anims.push((dt, el) => { tip.material.emissiveIntensity = (Math.sin(el * 3 + x) > .4) ? 2.5 : .3; }); }
   addBox(x, z, w + .2, d + .2); return g;
@@ -292,7 +293,7 @@ const STATIONS = [
    q:[['레이더가 하늘의 비행기를 찾아낼 수 있는 까닭은 전파의 어떤 성질 때문일까요?', ['반사(튕겨 나옴)', '흡수(먹혀 사라짐)', '투과(뚫고 지나감)', '증발(날아감)'], '금속 비행기에 부딪혀 튕겨 나온 반사파를 받아 비행기를 찾아요.'],
       ['레이더에서 반사파가 돌아오는 시간이 길수록 비행기는 어디에 있을까요?', ['멀리 있어요', '가까이 있어요', '땅에 내려앉아요', '사라졌어요'], '전파가 갔다 돌아오는 시간이 길수록 멀리 있는 거예요. 거리 = 속도 × 왕복 시간 ÷ 2.'],
       ['금속으로 만든 비행기는 전파를 어떻게 할까요?', ['잘 튕겨 내요', '모두 먹어 버려요', '그냥 통과시켜요', '소리로 바꿔요'], '금속은 전파를 거의 다 튕겨 내요. 레이더가 이 성질을 이용해요.']]},
-  {id:'iono', name:'전리층 전망대', e:'🌌', fq:93.3, at:[-56, -56], col:0x7c5cff, tr:['🔮', '오로라 구슬'],
+  {id:'iono', name:'전리층 전망대', e:'🌌', fq:93.3, at:[0, -56], col:0x7c5cff, tr:['🔮', '오로라 구슬'],
    q:[['단파 라디오 전파를 반사해 지구 반대편까지 보내 주는 높은 하늘의 층은?', ['전리층', '구름층', '얼음층', '먼지층'], '전리층은 태양 빛을 받아 전기를 띤 공기층이에요. 단파를 반사해 멀리 보내 줘요(공간파).'],
       ['항공 무선과 텔레비전이 쓰는, 곧게 나아가 보이는 곳까지만 가는 전파는?', ['직접파', '지표파', '공간파', '음파'], '직접파는 곧게 가요. 그래서 높이 나는 비행기일수록 더 멀리 교신할 수 있어요.'],
       ['땅의 표면을 따라 멀리 가는 전파로, 중파(AM) 라디오가 쓰는 것은?', ['지표파', '직접파', '공간파', '초음파'], '지표파는 땅 표면을 따라 휘어 가요. 낮에도 수백 km까지 가요.']]},
@@ -312,15 +313,15 @@ const STATIONS = [
    q:[['GPS는 인공위성 몇 개 이상의 신호로 내 위치를 계산할까요?', ['4개', '1개', '2개', '100개'], 'GPS는 위성 4개 이상의 신호로 위치를 계산해요. 내비게이션과 비행기 항로에 쓰여요.'],
       ['산속에서 길을 잃었을 때 내 위치를 알아내려면 어떤 기술이 필요할까요?', ['GPS', 'NFC', '블루투스', 'AM 라디오'], 'GPS 위성은 약 2만 km 높이에서 돌며 어디서나 위치를 알려 줘요.'],
       ['GPS 위성은 대략 얼마나 높은 곳에서 돌고 있을까요?', ['약 2만 km', '약 2 km', '약 200 m', '약 20 km'], 'GPS 위성은 약 2만 km 높이에서 지구를 돌아요.']]},
-  {id:'nfc', name:'NFC 교통센터', e:'🚌', fq:106.1, at:[-56, 56], col:0x4dffa6, tr:['💳', '황금 교통카드'],
+  {id:'nfc', name:'NFC 교통센터', e:'🚌', fq:106.1, at:[-56, 0], col:0x4dffa6, tr:['💳', '황금 교통카드'],
    q:[['교통카드처럼 10cm 안에서 가까이 대야만 통하는 무선 통신은?', ['NFC', '와이파이', '위성통신', '이동통신'], 'NFC는 10cm 안에서만 통해요. 버스 탈 때 카드를 톡 대는 것이 NFC예요.'],
       ['도서관 책 뒤의 작은 태그를 전파로 읽어 어떤 책인지 알아내는 기술은?', ['RFID', 'GPS', '레이더', 'FM'], 'RFID는 전파로 작은 태그의 정보를 읽어요.'],
       ['NFC가 카드 결제에 많이 쓰이는 까닭은?', ['가까이 대야만 통해 몰래 읽기 어려워서', '가장 멀리 가서', '소리가 커서', '인공위성을 써서'], '아주 가까이서만 통하니까 남이 몰래 읽기 어려워 안전해요.']]},
-  {id:'drone', name:'드론 정거장', e:'🚁', fq:90.3, at:[56, -56], col:0xff5fa2, tr:['🚁', '미니 드론'],
+  {id:'drone', name:'드론 정거장', e:'🚁', fq:90.3, at:[56, 0], col:0xff5fa2, tr:['🚁', '미니 드론'],
    q:[['전파가 끊기면 드론이 스스로 출발한 곳으로 돌아오는 기능은?', ['리턴 투 홈', '페어링', '핸드오버', '메이데이'], '전파가 끊겨도 「리턴 투 홈」 기능으로 드론이 집으로 돌아와요.'],
       ['드론 조종기가 주로 쓰는 전파 주파수는?', ['2.4GHz', '1kHz', '10Hz', '88MHz'], '드론 조종기는 2.4GHz 전파로 명령을 보내요.'],
       ['비행기의 위치와 높이를 전파로 알리는 장치는?', ['트랜스폰더', '스피커', '다이얼', '공유기'], '트랜스폰더가 비행기 위치와 높이를 관제소에 알려 줘요.']]},
-  {id:'safe', name:'재난방송센터', e:'🚨', fq:107.7, at:[56, 56], col:0xff5f5f, tr:['🔦', '구조 손전등'],
+  {id:'safe', name:'재난방송센터', e:'🚨', fq:107.7, at:[0, 56], col:0xff5f5f, tr:['🔦', '구조 손전등'],
    q:[['전기가 끊긴 재난 때도 계속 들을 수 있어 가장 믿음직한 것은?', ['건전지 라디오', '데스크톱 컴퓨터', '전기밥솥', '에어컨'], '건전지 라디오는 전기가 끊겨도 재난 방송을 들려줘요.'],
       ['배와 비행기가 위험할 때 전파로 보내는 조난 신호는?', ['메이데이', '굿모닝', '브라보', '파이팅'], '「메이데이」는 도와 달라는 조난 신호예요.'],
       ['비행기를 탈 때 휴대전화를 비행기 모드로 바꾸는 까닭은?', ['전파 간섭을 막으려고', '배터리를 늘리려고', '사진을 잘 찍으려고', '소리를 키우려고'], '휴대전화 전파가 조종석 무선 장비에 잡음(간섭)을 일으킬 수 있어서예요.']]},
@@ -329,7 +330,7 @@ const STATIONS = [
 /* 방송국 건물(랜드마크) */
 function sign(st, y){ const lab = document.createElement('div'); lab.className = 'lab'; $('#labels').appendChild(lab); st.lab = lab; st.labY = y; }
 function buildLandmark(st){
-  const [cx, cz] = st.at, g = new THREE.Group(); g.position.set(cx, 0, cz - 4.5); scene.add(g); const C = st.col, white = mat(0xf2f5fa), steel = mat(0xb8c4d4, {metalness:.6, roughness:.35}), dark = mat(0x2a3448);
+  const [cx, cz] = st.at, g = new THREE.Group(); g.position.set(cx, 0, cz - 4.5); g.scale.setScalar(.7); scene.add(g);   /* 랜드마크도 낮게 */ const C = st.col, white = mat(0xf2f5fa), steel = mat(0xb8c4d4, {metalness:.6, roughness:.35}), dark = mat(0x2a3448);
   const pad = mesh(new THREE.CylinderGeometry(9.5, 9.5, .16, 32), plazaM, false); pad.position.set(cx, .1, cz); scene.add(pad);
   let H = 8;
   if (st.id === 'tx'){ H = 22; for (let i = 0; i < 6; i++){ const s = 3 - i * .45, seg = new THREE.Mesh(new THREE.CylinderGeometry(s * .62, s * .75, 3.6, 4, 1, true), new THREE.MeshStandardMaterial({color:i % 2 ? 0xffffff : 0xff4d4d, wireframe:true})); seg.position.y = 1.8 + i * 3.5; seg.rotation.y = Math.PI / 4; g.add(seg); }
@@ -382,14 +383,14 @@ function buildLandmark(st){
   // 표지판 + 도착 고리 + 보물상자
   sign(st, H + 1.5);
   const ringM = new THREE.MeshBasicMaterial({color:C, transparent:true, opacity:.75});
-  const ring = mesh(new THREE.TorusGeometry(2.2, .14, 8, 40), ringM, false); ring.rotation.x = Math.PI / 2; ring.position.set(cx, .3, cz + 4); scene.add(ring);
-  const beam = mesh(new THREE.CylinderGeometry(2.1, 2.1, 6, 24, 1, true), new THREE.MeshBasicMaterial({color:C, transparent:true, opacity:.12, side:THREE.DoubleSide, depthWrite:false}), false); beam.position.set(cx, 3, cz + 4); scene.add(beam);
-  const chest = new THREE.Group(); chest.position.set(cx + 4.6, .12, cz + 4); scene.add(chest); const wood = mat(0x9a5a28), gold = mat(0xffcc33, {metalness:.7, roughness:.3});
+  const ring = mesh(new THREE.TorusGeometry(4.2, .25, 8, 48), ringM, false); ring.rotation.x = Math.PI / 2; ring.position.set(cx, .3, cz + 4); scene.add(ring);
+  const beam = mesh(new THREE.CylinderGeometry(4, 4, 60, 24, 1, true), new THREE.MeshBasicMaterial({color:C, transparent:true, opacity:.16, side:THREE.DoubleSide, depthWrite:false, fog:false}), false); beam.position.set(cx, 30, cz + 4); scene.add(beam);
+  const chest = new THREE.Group(); chest.position.set(cx + 6.8, .12, cz + 4); chest.scale.setScalar(1.8); scene.add(chest); const wood = mat(0x9a5a28), gold = mat(0xffcc33, {metalness:.7, roughness:.3});
   const cb = box(1.4, .8, .9, wood); cb.position.y = .4; chest.add(cb); const band = box(1.44, .14, .94, gold); band.position.y = .55; chest.add(band);
   const lid = new THREE.Group(); lid.position.set(0, .8, -.45); chest.add(lid); const lb = mesh(new THREE.CylinderGeometry(.45, .45, 1.4, 10, 1, false, 0, Math.PI), wood); lb.rotation.z = Math.PI / 2; lb.position.z = .45; lid.add(lb); const lock = box(.22, .26, .08, gold); lock.position.set(0, .45, .93); chest.add(lock);
-  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(.35, 0), glow(C, 1.6)); gem.position.y = .9; gem.visible = false; chest.add(gem); addBox(cx + 4.6, cz + 4, 1.5, 1);
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(.35, 0), glow(C, 1.6)); gem.position.y = .9; gem.visible = false; chest.add(gem); addBox(cx + 6.8, cz + 4, 2.6, 1.7);
   st.ring = ring; st.beam = beam; st.chest = chest; st.lid = lid; st.gem = gem; st.marker = new THREE.Vector3(cx, 0, cz + 4); st.open = 0;
-  anims.push((dt, el) => { ring.scale.setScalar(1 + .06 * Math.sin(el * 3)); if (st.done){ st.open = Math.min(1, st.open + dt * 2); lid.rotation.x = -st.open * 1.9; gem.visible = true; gem.rotation.y += dt * 2; gem.position.y = .9 + st.open * .6 + Math.sin(el * 2) * .1; } });
+  anims.push((dt, el) => { ring.scale.setScalar(1 + .06 * Math.sin(el * 3)); beam.visible = !st.done; ring.visible = !st.done; if (st.done){ st.open = Math.min(1, st.open + dt * 2); lid.rotation.x = -st.open * 1.9; gem.visible = true; gem.rotation.y += dt * 2; gem.position.y = .9 + st.open * .6 + Math.sin(el * 2) * .1; } });
 }
 STATIONS.forEach(buildLandmark);
 
@@ -399,22 +400,22 @@ STATIONS.forEach(buildLandmark);
     if (mi % 5 === 2){ const p = mesh(new THREE.BoxGeometry(19, .14, 19), grassM, false); p.position.set(cx, .14, cz); scene.add(p); for (let i = 0; i < 9; i++) tree(cx + rnd(-8, 8), cz + rnd(-8, 8), rnd(.8, 1.3));
       const f = cyl(2, 2.3, .6, mat(0xdfe7f0), 16); f.position.set(cx, .4, cz); scene.add(f); const w = cyl(1.8, 1.8, .1, glow(0x7fe8ff, .5), 16); w.position.set(cx, .72, cz); scene.add(w); const jet = cyl(.08, .2, 2.5, new THREE.MeshBasicMaterial({color:0xcff6ff, transparent:true, opacity:.6}), 8); jet.position.set(cx, 1.9, cz); scene.add(jet); addCirc(cx, cz, 2.4); return; }
     const n = 1 + (mi % 3); const spots = n === 1 ? [[0, 0, 13, 12]] : n === 2 ? [[-4.5, -1, 8, 13], [5, 2, 7, 10]] : [[-5, -4.5, 7.5, 8], [4.5, -4, 8, 8], [0, 5, 13, 6]];
-    spots.forEach(([dx, dz, w, d], k) => tower(cx + dx, cz + dz, w, d, rnd(12, 42), mi + k));
+    spots.forEach(([dx, dz, w, d], k) => tower(cx + dx, cz + dz, w, d, rnd(5, 10), mi + k));
   })); }
 /* 가로등 */
 ROADS.forEach(r => { for (let t = -66; t <= 66; t += 14){ if (Math.abs(t) < 9 && Math.abs(r) < 15) continue; lamp(t, r - 4.6); lamp(r + 4.6, t); } });
 /* 도시 바깥 스카이라인 (들어갈 수 없는 곳) */
-for (let i = 0; i < 46; i++){ const a = i / 46 * Math.PI * 2, R = rnd(96, 120), w = rnd(8, 16), h = rnd(25, 75), x = Math.cos(a) * R, z = Math.sin(a) * R; const b = box(w, h, w, BMATS[i % BMATS.length]); b.position.set(x, h / 2, z); b.castShadow = false; scene.add(b); }
+for (let i = 0; i < 46; i++){ const a = i / 46 * Math.PI * 2, R = rnd(96, 120), w = rnd(8, 16), h = rnd(8, 18), x = Math.cos(a) * R, z = Math.sin(a) * R; const b = box(w, h, w, BMATS[i % BMATS.length]); b.position.set(x, h / 2, z); b.castShadow = false; scene.add(b); }
 /* 하늘을 나는 자동차(공중 택시) */
 for (let i = 0; i < 12; i++){ const car = new THREE.Group(); scene.add(car); const body = mesh(new THREE.SphereGeometry(1, 12, 8), mat(neon[i % 5], {metalness:.4, roughness:.3})); body.scale.set(1.1, .55, 2); car.add(body);
   const cab = mesh(new THREE.SphereGeometry(.75, 12, 8), mat(0x9fe7ff, {roughness:.05, metalness:.4, transparent:true, opacity:.85})); cab.position.set(0, .45, -.2); cab.scale.set(1, .7, 1.2); car.add(cab);
   const tail = mesh(new THREE.ConeGeometry(.35, 2.4, 8), new THREE.MeshBasicMaterial({color:0x7ff6ff, transparent:true, opacity:.55}), false); tail.rotation.x = -Math.PI / 2; tail.position.z = -2.8; car.add(tail);
-  const lane = ROADS[i % 6], alt = rnd(16, 30), sp = rnd(10, 18) * (i % 2 ? 1 : -1), along = i % 4 < 2; let t = rnd(-90, 90);
+  const lane = ROADS[i % 6], alt = rnd(40, 52), sp = rnd(10, 18) * (i % 2 ? 1 : -1), along = i % 4 < 2; let t = rnd(-90, 90);
   anims.push((dt, el) => { t += sp * dt; if (t > 100) t = -100; if (t < -100) t = 100; if (along){ car.position.set(t, alt + Math.sin(el + i) * .6, lane); car.rotation.y = sp > 0 ? Math.PI / 2 : -Math.PI / 2; } else { car.position.set(lane, alt + Math.sin(el + i) * .6, t); car.rotation.y = sp > 0 ? 0 : Math.PI; } }); }
 /* 홀로그램 간판 */
 [['RADIO CITY', -14, -14, '#38e1ff'], ['전파 도시', 14, 14, '#ff5fa2'], ['6G READY', 14, -14, '#ffd23f'], ['FM 100.0', -14, 14, '#4dffa6']].forEach(([t, x, z, c], i) => {
   const tex = canvasTex(512, 128, (g, w, h) => { g.fillStyle = 'rgba(0,0,0,0)'; g.fillRect(0, 0, w, h); g.font = '700 64px Jua, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = c; g.shadowBlur = 24; g.fillStyle = c; g.fillText(t, w / 2, h / 2); g.fillStyle = '#fff'; g.shadowBlur = 0; g.globalAlpha = .7; g.fillText(t, w / 2, h / 2); });
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false})); sp.scale.set(14, 3.5, 1); sp.position.set(x, 26 + i * 2, z); scene.add(sp); anims.push((dt, el) => { sp.material.opacity = .75 + .25 * Math.sin(el * 2 + i); }); });
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false})); sp.scale.set(14, 3.5, 1); sp.position.set(x * 3.2, 36 + i * 2, z * 3.2); sp.scale.set(22, 5.5, 1); scene.add(sp); anims.push((dt, el) => { sp.material.opacity = .75 + .25 * Math.sin(el * 2 + i); }); });
 
 /* ---------------- 가운데 광장: 보물 금고 (12개 보물을 모으면 열림) ---------------- */
 const vault = { sockets:[], open:0 };
@@ -432,8 +433,9 @@ const vault = { sockets:[], open:0 };
 
 /* ---------------- 주인공: 로봇 라디오 (합판 몸통 · 노란 머리 · 하늘색 바이저 · 안테나 · 등에 라디오 케이스) ---------------- */
 const plyTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#d6a468'; g.fillRect(0, 0, w, h); for (let i = 0; i < 26; i++){ g.strokeStyle = `rgba(140,90,40,${rnd(.08, .22)})`; g.lineWidth = rnd(.6, 2); g.beginPath(); const y = rnd(0, h); g.moveTo(0, y); g.bezierCurveTo(w * .3, y + rnd(-6, 6), w * .7, y + rnd(-6, 6), w, y + rnd(-4, 4)); g.stroke(); } g.strokeStyle = 'rgba(110,60,20,.55)'; g.lineWidth = 5; g.strokeRect(0, 0, w, h); });
-const robot = { g:new THREE.Group(), pos:new THREE.Vector3(0, 0, 11), heading:Math.PI, want:Math.PI, mode:'stop', target:null, speed:7, walk:0, mag:1 };
-{ const R = robot.g; scene.add(R); const rig = new THREE.Group(); R.add(rig); robot.rig = rig;
+const BIG = 2.6;   /* 대형 로봇: 건물보다 크게 */
+const robot = { g:new THREE.Group(), pos:new THREE.Vector3(0, 0, 13), heading:Math.PI, want:Math.PI, mode:'stop', target:null, speed:7, walk:0, mag:1 };
+{ const R = robot.g; R.scale.setScalar(BIG); scene.add(R); const rig = new THREE.Group(); R.add(rig); robot.rig = rig;
   const ply = new THREE.MeshStandardMaterial({map:plyTex, roughness:.75}), yel = mat(0xf2e81c, {roughness:.45}), cyan = new THREE.MeshStandardMaterial({color:0x1fc8c8, emissive:0x1fc8c8, emissiveIntensity:.25, roughness:.3}), blk = mat(0x1d1f24, {roughness:.5}), steel = mat(0xc9d2dc, {metalness:.8, roughness:.25});
   const torso = box(1.05, 1, .72, ply); torso.position.y = 1.4; rig.add(torso);
   // 가슴 스피커: 로봇 라디오는 안테나로 전파를 받고 가슴에서 소리가 나와요
@@ -480,7 +482,7 @@ const G = { state:'start', stars:0, t0:0, allDone:false, cur:null, tries:0, q:nu
 const inv = $('#inv'); STATIONS.forEach(st => { const s = document.createElement('span'); s.textContent = st.tr[0]; s.title = st.tr[1]; inv.appendChild(s); st.slot = s; });
 function banner(t, sec){ const b = $('#banner'); b.innerHTML = t; b.style.opacity = 1; clearTimeout(banner.tm); banner.tm = setTimeout(() => b.style.opacity = 0, (sec || 2.5) * 1000); }
 function updScore(){ const n = STATIONS.filter(s => s.done).length; $('#score').innerHTML = `<b>보물 ${n}/12</b><small>⭐ ${G.stars} · ${G.allDone ? '가운데 금고로!' : '방송국을 찾아요'}</small>`; }
-function nearestTarget(){ if (G.allDone) return {name:'보물 금고', p:new THREE.Vector3(0, 0, 4.5), vault:true}; let best = null, bd = 1e9; STATIONS.forEach(st => { if (st.done) return; const d = st.marker.distanceTo(robot.pos); if (d < bd){ bd = d; best = st; } }); return best && {name:best.name, p:best.marker, st:best}; }
+function nearestTarget(){ if (G.allDone) return {name:'보물 금고', p:new THREE.Vector3(0, 0, 6), vault:true}; let best = null, bd = 1e9; STATIONS.forEach(st => { if (st.done) return; const d = st.marker.distanceTo(robot.pos); if (d < bd){ bd = d; best = st; } }); return best && {name:best.name, p:best.marker, st:best}; }
 
 /* ---------------- 조종: 톡 누르기 = 그곳으로 / 누른 채 끌기 = 끄는 방향으로 (화면 위 = 북쪽) ---------------- */
 const joyEl = $('#joy'), joyKnob = joyEl.querySelector('i'); let joy = null, zoom = TOUCH ? .85 : 1; const ptrs = new Map(); let pinch = null; const JOY_R = 56;
@@ -497,7 +499,7 @@ cv.addEventListener('pointermove', ev => { if (ptrs.has(ev.pointerId)) ptrs.set(
 function joyEnd(ev){ ptrs.delete(ev.pointerId); if (pinch){ if (ptrs.size < 2) pinch = null; return; } if (!joy || joy.id !== ev.pointerId) return;
   const was = joy.active, moved = Math.hypot(ev.clientX - joy.x0, ev.clientY - joy.y0), dt = performance.now() - joy.t; joyReset();
   if (!was && moved < 12 && dt < 700 && G.state === 'play'){ const r = cv.getBoundingClientRect(); ray.setFromCamera({x:(ev.clientX - r.left) / r.width * 2 - 1, y:-(ev.clientY - r.top) / r.height * 2 + 1}, camera); const hit = new THREE.Vector3();
-    if (ray.ray.intersectPlane(gplane, hit)){ hit.x = Math.max(-LIMIT, Math.min(LIMIT, hit.x)); hit.z = Math.max(-LIMIT, Math.min(LIMIT, hit.z)); robot.target = hit; robot.mode = 'target'; robot.mag = .8; robot.stuck = 0; tapMark.position.set(hit.x, .2, hit.z); tapMark.visible = true; SFX.ping(); } } }
+    if (ray.ray.intersectPlane(gplane, hit)){ hit.x = Math.max(-LIMIT, Math.min(LIMIT, hit.x)); hit.z = Math.max(-LIMIT, Math.min(LIMIT, hit.z)); robot.target = hit; robot.mode = 'target'; robot.mag = .8; robot.stuck = 0; tapMark.position.set(hit.x, .2, hit.z); tapMark.scale.setScalar(2.5); tapMark.visible = true; SFX.ping(); } } }
 function joyReset(){ joy = null; joyEl.classList.remove('on'); joyKnob.style.transform = ''; if (robot.mode === 'joy') robot.mode = 'stop'; }
 cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd); window.addEventListener('pointerup', ev => { if (joy && joy.id === ev.pointerId) joyEnd(ev); });
 window.addEventListener('blur', joyReset); cv.addEventListener('touchstart', e => e.preventDefault(), {passive:false}); cv.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
@@ -505,7 +507,7 @@ cv.addEventListener('wheel', e => { zoom = Math.max(.55, Math.min(1.8, zoom * (e
 const keys = {}; window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; }); window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 const tapMark = mesh(new THREE.RingGeometry(.5, .7, 24), new THREE.MeshBasicMaterial({color:0x38e1ff, transparent:true, opacity:.8, side:THREE.DoubleSide}), false); tapMark.rotation.x = -Math.PI / 2; tapMark.visible = false; scene.add(tapMark);
 
-function collide(p){ const R = .65; for (const o of obstacles){ if (o.r !== undefined){ const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), m = o.r + R; if (d < m && d > 1e-4){ p.x = o.x + dx / d * m; p.z = o.z + dz / d * m; } continue; }
+function collide(p){ const R = .6 * BIG; for (const o of obstacles){ if (o.r !== undefined){ if (o.r < .9) continue;   /* 대형 로봇은 가로등·나무를 넘어감 */ const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), m = o.r + R; if (d < m && d > 1e-4){ p.x = o.x + dx / d * m; p.z = o.z + dz / d * m; } continue; }
     if (p.x > o.x0 - R && p.x < o.x1 + R && p.z > o.z0 - R && p.z < o.z1 + R){ const pl = p.x - (o.x0 - R), pr = (o.x1 + R) - p.x, pu = p.z - (o.z0 - R), pd = (o.z1 + R) - p.z, m = Math.min(pl, pr, pu, pd);
       if (m === pl) p.x = o.x0 - R; else if (m === pr) p.x = o.x1 + R; else if (m === pu) p.z = o.z0 - R; else p.z = o.z1 + R; } }
   if (Math.abs(p.x) > LIMIT || Math.abs(p.z) > LIMIT){ p.x = Math.max(-LIMIT, Math.min(LIMIT, p.x)); p.z = Math.max(-LIMIT, Math.min(LIMIT, p.z)); if (!collide.warn || clock.elapsedTime - collide.warn > 4){ collide.warn = clock.elapsedTime; say('여기는 도시의 끝이에요. 안쪽으로 돌아가요!'); } } }
@@ -551,7 +553,7 @@ $('#voiceOpt').onclick = () => { voiceOn = !voiceOn; paintVoice(); }; $('#voiceB
 $('#sndBtn').onclick = () => { sndOn = !sndOn; if (!sndOn) Tuner.stop(); paintVoice(); };
 function resetGame(){ STATIONS.forEach(st => { st.done = false; st.open = 0; st.cool = false; st.lid.rotation.x = 0; st.gem.visible = false; st.slot.classList.remove('got'); });
   vault.sockets.forEach(({g}) => g.material = mat(0x55607a)); vault.open = 0; vault.prize.visible = false; vault.L.rotation.y = Math.PI / 2; vault.R.rotation.y = -Math.PI / 2;
-  Object.assign(G, {stars:0, allDone:false, cur:null, ended:false}); G.nearAnnounced.clear(); robot.pos.set(0, 0, 11); robot.heading = robot.want = Math.PI; robot.mode = 'stop'; robot.target = null; updScore(); }
+  Object.assign(G, {stars:0, allDone:false, cur:null, ended:false}); G.nearAnnounced.clear(); robot.pos.set(0, 0, 13); robot.heading = robot.want = Math.PI; robot.mode = 'stop'; robot.target = null; updScore(); }
 $('#startBtn').onclick = () => { ac(); resetGame(); $('#startScreen').hidden = true; G.state = 'play'; G.t0 = clock.elapsedTime;
   if ('speechSynthesis' in window){ try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch(e){} }   // 휴대폰: 첫 터치 때 음성 사용 허락
   say('안녕! 나는 전파로 말하는 로봇 라디오야. 미래도시 방송국 12곳에서 주파수를 맞추고 문제를 풀어 보물을 모아 줘!'); banner(TOUCH ? '땅을 톡 누르거나, 누른 채 끌어서 움직여요' : '땅을 클릭하거나, 누른 채 끌어서 움직여요 (WASD도 돼요)', 4); };
@@ -577,21 +579,21 @@ function update(dt, el){
     if (kx || kz){ robot.mode = 'joy'; robot.mag = .8; robot.want = Math.atan2(kx, kz); robot.target = null; robot.key = true; } else if (robot.key){ robot.key = false; if (robot.mode === 'joy' && !joy) robot.mode = 'stop'; } }
   let moving = false; const before = robot.pos.clone();
   if (G.state === 'play'){
-    if (robot.mode === 'joy'){ robot.heading = angleTo(robot.heading, robot.want, dt * 12); if (Math.abs(angleDiff(robot.want, robot.heading)) < 1.2){ robot.pos.addScaledVector(fwdVec(robot.heading), (4 + 7 * robot.mag) * dt); moving = true; } }
+    if (robot.mode === 'joy'){ robot.heading = angleTo(robot.heading, robot.want, dt * 12); if (Math.abs(angleDiff(robot.want, robot.heading)) < 1.2){ robot.pos.addScaledVector(fwdVec(robot.heading), (9 + 13 * robot.mag) * dt); moving = true; } }
     else if (robot.mode === 'target' && robot.target){ const dx = robot.target.x - robot.pos.x, dz = robot.target.z - robot.pos.z, d = Math.hypot(dx, dz);
-      if (d < .35){ robot.mode = 'stop'; tapMark.visible = false; } else { robot.want = Math.atan2(dx, dz); robot.heading = angleTo(robot.heading, robot.want, dt * 10); if (Math.abs(angleDiff(robot.want, robot.heading)) < 1.2){ robot.pos.addScaledVector(fwdVec(robot.heading), Math.min(d / dt, 8) * dt); moving = true; } } }
+      if (d < .8){ robot.mode = 'stop'; tapMark.visible = false; } else { robot.want = Math.atan2(dx, dz); robot.heading = angleTo(robot.heading, robot.want, dt * 10); if (Math.abs(angleDiff(robot.want, robot.heading)) < 1.2){ robot.pos.addScaledVector(fwdVec(robot.heading), Math.min(d / dt, 17) * dt); moving = true; } } }
     collide(robot.pos);
-    if (robot.mode === 'target' && moving){ const prog = robot.pos.distanceTo(before); robot.stuck = prog < dt * 1.2 ? (robot.stuck || 0) + dt : 0; if (robot.stuck > .8){ robot.mode = 'stop'; tapMark.visible = false; robot.stuck = 0; say('앗, 건물에 막혔어. 길(도로)로 돌아서 가 볼까?', {quiet:true}); } }
+    if (robot.mode === 'target' && moving){ const prog = robot.pos.distanceTo(before); robot.stuck = prog < dt * 2.5 ? (robot.stuck || 0) + dt : 0; if (robot.stuck > .8){ robot.mode = 'stop'; tapMark.visible = false; robot.stuck = 0; say('앗, 건물에 막혔어. 길(도로)로 돌아서 가 볼까?', {quiet:true}); } }
     // 방송국 도착
-    STATIONS.forEach(st => { const d = st.marker.distanceTo(robot.pos); if (st.cool && d > 4) st.cool = false;
-      if (!st.done && !st.cool && d < 2.4) openStation(st);
-      if (!st.done && d < 24 && !G.nearAnnounced.has(st.id) && G.state === 'play'){ G.nearAnnounced.add(st.id); say(`삐빅! ${st.name}의 ${st.fq.toFixed(1)}메가헤르츠 전파가 잡혀요!`); } });
-    if (G.allDone && !G.ended && robot.pos.distanceTo(new THREE.Vector3(0, 0, -1.5)) < 6.2){ G.ended = true; SFX.win(); say('황금 라디오다! 전파 박사가 된 걸 축하해!');
+    STATIONS.forEach(st => { const d = st.marker.distanceTo(robot.pos); if (st.cool && d > 7) st.cool = false;
+      if (!st.done && !st.cool && d < 4.6) openStation(st);
+      if (!st.done && d < 30 && !G.nearAnnounced.has(st.id) && G.state === 'play'){ G.nearAnnounced.add(st.id); say(`삐빅! ${st.name}의 ${st.fq.toFixed(1)}메가헤르츠 전파가 잡혀요!`); } });
+    if (G.allDone && !G.ended && robot.pos.distanceTo(new THREE.Vector3(0, 0, -1.5)) < 7.5){ G.ended = true; SFX.win(); say('황금 라디오다! 전파 박사가 된 걸 축하해!');
       setTimeout(() => { G.state = 'end'; const t = Math.round(el - G.t0); $('#endtxt').innerHTML = `방송국 12곳의 보물을 모두 모았어요!<br>⭐ <b>${G.stars}</b> / 36 · 걸린 시간 ${Math.floor(t / 60)}분 ${t % 60}초<br>전파로 이어진 미래도시를 지켜 줘서 고마워요.`; $('#endScreen').hidden = false; }, 2600); }
   }
   robot.heading = Math.atan2(Math.sin(robot.heading), Math.cos(robot.heading)); robot.want = Math.atan2(Math.sin(robot.want), Math.cos(robot.want));
   // 로봇 모습: 걷기 · 말하기
-  robot.g.position.lerp(robot.pos, .6); robot.g.rotation.y = robot.heading; robot.walk += dt * (moving ? 11 : 0); const sw = Math.sin(robot.walk);
+  robot.g.position.lerp(robot.pos, .6); robot.g.rotation.y = robot.heading; robot.walk += dt * (moving ? 8 : 0); const sw = Math.sin(robot.walk);
   robot.legL.rotation.x = moving ? sw * .55 : robot.legL.rotation.x * .8; robot.legR.rotation.x = moving ? -sw * .55 : robot.legR.rotation.x * .8;
   robot.armL.rotation.x = moving ? -sw * .6 : robot.armL.rotation.x * .8; robot.armR.rotation.x = moving ? sw * .6 : robot.armR.rotation.x * .8;
   robot.rig.position.y = moving ? Math.abs(Math.cos(robot.walk)) * .09 : 0; robot.ant.rotation.z = Math.sin(el * 3) * .04 + (moving ? Math.cos(robot.walk) * .08 : 0);
@@ -601,23 +603,25 @@ function update(dt, el){
   robot.head.rotation.z = talking ? Math.sin(el * 7) * .06 : 0; robot.led.material.emissiveIntensity = (Math.sin(el * 4) > 0) ? 2.5 : .4;
   const tipW = new THREE.Vector3(); robot.tip.getWorldPosition(tipW);
   // 안테나로는 전파가 모여 들어오고(받기), 가슴 스피커에서는 소리 물결이 퍼져 나감(말하기)
-  waveRings.forEach(w => { w.k = (w.k + dt * .9) % 1; const k = 1 - w.k; w.r.position.copy(tipW); w.r.lookAt(camera.position); w.r.scale.setScalar(.3 + k * 4); w.r.material.opacity = talking ? (1 - k) * .85 : 0; });
+  waveRings.forEach(w => { w.k = (w.k + dt * .9) % 1; const k = 1 - w.k; w.r.position.copy(tipW); w.r.lookAt(camera.position); w.r.scale.setScalar((.3 + k * 4) * BIG); w.r.material.opacity = talking ? (1 - k) * .85 : 0; });
   const spkW = new THREE.Vector3(); robot.spk.getWorldPosition(spkW); const fw = fwdVec(robot.heading);
-  soundRings.forEach(w => { w.k = (w.k + dt * 1.4) % 1; w.r.position.copy(spkW).addScaledVector(fw, .2 + w.k * 1.6); w.r.rotation.set(0, robot.heading, Math.PI * .55); w.r.scale.setScalar(.6 + w.k * 1.6); w.r.material.opacity = talking ? (1 - w.k) * .9 : 0; });
+  soundRings.forEach(w => { w.k = (w.k + dt * 1.4) % 1; w.r.position.copy(spkW).addScaledVector(fw, (.2 + w.k * 1.6) * BIG); w.r.rotation.set(0, robot.heading, Math.PI * .55); w.r.scale.setScalar((.6 + w.k * 1.6) * BIG); w.r.material.opacity = talking ? (1 - w.k) * .9 : 0; });
   robot.spk.scale.z = talking ? 1 + Math.abs(Math.sin(el * 30)) * .8 : 1; robot.spkCap.position.z = talking ? .04 + Math.abs(Math.sin(el * 30)) * .04 : .04;
-  if (el > bubbleUntil || G.state === 'quiz') $('#bubble').hidden = true; else { const s = toScreen(robot.g.position.clone().add(new THREE.Vector3(0, 4.2, 0))); const b = $('#bubble'); b.style.left = Math.max(170, Math.min(innerWidth - 170, s.x)) + 'px'; b.style.top = Math.max(110, s.y) + 'px'; }
+  if (el > bubbleUntil || G.state === 'quiz') $('#bubble').hidden = true; else { const s = toScreen(robot.g.position.clone().add(new THREE.Vector3(0, 4.2 * BIG, 0))); const b = $('#bubble'); b.style.left = Math.max(170, Math.min(innerWidth - 170, s.x)) + 'px'; b.style.top = Math.max(110, s.y) + 'px'; }
   // 카메라
-  camPos.set(robot.g.position.x, 12 * zoom + 2, robot.g.position.z + 17 * zoom); camera.position.lerp(camPos, Math.min(1, dt * 5)); camera.lookAt(robot.g.position.x, 1.6, robot.g.position.z - 4 * zoom);
+  camPos.set(robot.g.position.x, 30 * zoom + 4, robot.g.position.z + 25 * zoom); camera.position.lerp(camPos, Math.min(1, dt * 5)); camera.lookAt(robot.g.position.x, 4, robot.g.position.z - 7 * zoom);
   sun.position.set(robot.pos.x + 30, 55, robot.pos.z + 18); sun.target.position.copy(robot.pos);
   // 안내 화살표 · 전파 세기
-  const nt = nearestTarget(); if (nt && G.state === 'play'){ const d = nt.p.distanceTo(robot.pos); guide.visible = d > 3.5; guide.position.set(robot.g.position.x, .25, robot.g.position.z); guide.rotation.y = Math.atan2(nt.p.x - robot.pos.x, nt.p.z - robot.pos.z);
+  const nt = nearestTarget(); if (nt && G.state === 'play'){ const d = nt.p.distanceTo(robot.pos); guide.visible = d > 3.5; guide.position.set(robot.g.position.x, .25, robot.g.position.z); guide.scale.setScalar(2.2); guide.rotation.y = Math.atan2(nt.p.x - robot.pos.x, nt.p.z - robot.pos.z);
     const bars = d < 8 ? 5 : d < 22 ? 4 : d < 40 ? 3 : d < 65 ? 2 : 1; [...$('#bars').children].forEach((b, i) => b.classList.toggle('on', i < bars)); if (bars > G.lastBars && G.lastBars) SFX.ping(); G.lastBars = bars;
     const txt = `📶 <b>${nt.name}</b><br>${nt.st ? nt.st.fq.toFixed(1) + 'MHz · ' : ''}${Math.round(d)}m`; if ($('#sigtxt').innerHTML !== txt) $('#sigtxt').innerHTML = txt; } else guide.visible = false;
   if (tapMark.visible) tapMark.material.opacity = .5 + .4 * Math.sin(el * 6);
   // 이름표
-  STATIONS.forEach(st => { const p = new THREE.Vector3(st.at[0], 5.2, st.at[1] + 4), s = toScreen(p), near = p.distanceTo(robot.pos) < 75; st.lab.style.display = s.ok && near && s.y > 60 && s.y < innerHeight - 40 ? '' : 'none';
+  STATIONS.forEach(st => { const p = new THREE.Vector3(st.at[0], 9, st.at[1] + 4), s = toScreen(p), near = p.distanceTo(robot.pos) < 75; st.lab.style.display = s.ok && near && s.y > 60 && s.y < innerHeight - 40 ? '' : 'none';
     if (s.ok && near){ st.lab.style.left = s.x + 'px'; st.lab.style.top = s.y + 'px'; const t = `${st.done ? '✅' : st.e} ${st.name} · ${st.fq.toFixed(1)}`; if (st.lab.textContent !== t){ st.lab.textContent = t; st.lab.classList.toggle('done', !!st.done); } } });
   { const s = toScreen(new THREE.Vector3(0, 6, -1.5)), near = robot.pos.length() < 60; vault.lab.style.display = s.ok && near ? '' : 'none'; vault.lab.style.left = s.x + 'px'; vault.lab.style.top = s.y + 'px'; const n = STATIONS.filter(x => x.done).length; const t = G.allDone ? '🏆 보물 금고 열림!' : `🔒 보물 금고 ${n}/12`; if (vault.lab.textContent !== t) vault.lab.textContent = t; }
+  TOWERS.forEach(t => { const block = t.z - t.d / 2 > robot.pos.z - 2 && t.z - t.d / 2 < robot.pos.z + 34 * zoom && Math.abs(t.x - robot.pos.x) < t.w / 2 + 9;
+    const want = block ? .22 : 1; if (Math.abs(t.fade - want) > .01){ t.fade += (want - t.fade) * Math.min(1, dt * 8); t.g.traverse(o => { if (o.isMesh){ o.material.transparent = true; o.material.opacity = t.fade; o.material.depthWrite = t.fade > .9; } }); } });
   anims.forEach(f => f(dt, el));
 }
 const FACTS = ['라디오라는 이름은 「전파」를 뜻하는 영어 radio에서 왔대.', '전파는 1초에 지구를 7바퀴 반이나 돌 만큼 빨라!', '우리나라 첫 라디오 방송은 1927년 경성방송국이었어.', '밤에는 먼 지역 라디오가 더 잘 들려. 전리층이 바뀌기 때문이야.', '화성 탐사 로버의 신호가 지구까지 오는 데 최대 22분이 걸린대.', '블루투스라는 이름은 「푸른 이빨」이라는 별명의 덴마크 왕에게서 왔어.', '비행기 한 대에는 안테나가 20개도 넘게 달려 있어.', '보이저 1호는 약 250억 km 밖에서 지금도 전파를 보내고 있어!'];
