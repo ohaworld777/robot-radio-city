@@ -42,6 +42,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b1630;color:var(--in
 #joy{position:fixed;z-index:6;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;border:2px solid rgba(56,225,255,.55);background:rgba(56,225,255,.08);pointer-events:none;display:none}
 #joy.on{display:block}
 #joy i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(56,225,255,.5);box-shadow:0 0 14px var(--cyan)}
+.dock{position:fixed;z-index:20;right:14px;bottom:60px;width:min(440px,calc(100% - 28px));max-height:calc(100% - 150px);display:flex;flex-direction:column}
+.dock .sheet{max-height:100%;overflow:auto}
 .modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(4,10,24,.55);padding:16px}
 .sheet{width:min(560px,100%);max-height:calc(100% - 8px);overflow:auto;background:linear-gradient(160deg,#13284a,#0b1a33);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .sheet h1{font-family:var(--ui);font-weight:400;font-size:clamp(26px,6vw,38px);margin:0;line-height:1.15;text-align:center}
@@ -71,6 +73,7 @@ input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:5px;b
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;margin-top:-10px;border-radius:50%;background:radial-gradient(#ff8a3d,#c2410c);border:3px solid #ffd9a8}
 input[type=range]::-moz-range-track{height:10px;border-radius:5px;background:repeating-linear-gradient(90deg,#e6c79a 0 2px,#5a4128 2px 14px)}
 input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#ff8a3d;border:3px solid #ffd9a8}
+.autobtn{display:block;width:100%;margin-top:8px;font-family:var(--ui);font-size:17px;color:#2a1a08;background:linear-gradient(#ffe08a,#f2b84b);border:0;border-radius:12px;padding:9px;cursor:pointer;box-shadow:0 4px 0 #a8722f}.autobtn:active{transform:translateY(2px);box-shadow:0 2px 0 #a8722f}
 .tip{font-size:13px;color:#e6c79a;margin:8px 2px 0;line-height:1.5}
 .q{font-size:clamp(16px,3.6vw,19px);line-height:1.55;margin:12px 2px;color:#fff}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -86,6 +89,8 @@ input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;bac
 @keyframes sh{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 .ghost{background:none;border:1px solid #6b5033;color:#e6c79a;border-radius:10px;padding:6px 10px;font:13px system-ui;cursor:pointer}
 @media (max-width:640px){
+  .dock{left:6px;right:6px;bottom:46px;width:auto;max-height:58%}
+  .dock .sheet{padding:10px 12px}.dock .lcd{margin:6px 0;padding:6px 10px}.dock .q{margin:6px 2px;font-size:15.5px}.dock .opts button{min-height:44px;padding:8px;font-size:14px}.dock .tip{margin-top:4px;font-size:12px}
   .hud{padding:6px 6px;gap:5px}
   #score{font-size:15px}#score small{font-size:10.5px}
   .chip{padding:5px 8px;border-radius:11px}
@@ -128,12 +133,13 @@ input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;bac
   </div>
 </div>
 
-<div class="modal" id="quiz" hidden>
+<div class="dock" id="quiz" hidden>
   <div class="sheet radio" id="qsheet">
     <div class="rtop"><span id="qname">📡 방송국</span><button class="ghost" id="qclose" type="button">나가기</button></div>
     <div class="lcd"><div class="f" id="lcdf">88.0</div><div class="t" id="lcdt">목표 주파수<br><b id="lcdg">89.1 MHz</b></div></div>
     <div id="tuneBox">
       <div class="dialrow"><button type="button" id="dn">◀</button><input type="range" id="dial" min="880" max="1080" step="1" value="900"><button type="button" id="up">▶</button></div>
+      <button type="button" class="autobtn" id="autoBtn">📡 자동 주파수</button>
       <p class="tip" id="tuneTip">다이얼을 돌려 주파수를 맞춰요. 맞을수록 「치지직」 잡음이 줄고 방송 소리가 커져요.</p>
     </div>
     <div id="qBox" hidden>
@@ -487,7 +493,8 @@ function nearestTarget(){ if (G.allDone) return {name:'보물 금고', p:new THR
 /* ---------------- 조종: 톡 누르기 = 그곳으로 / 누른 채 끌기 = 끄는 방향으로 (화면 위 = 북쪽) ---------------- */
 const joyEl = $('#joy'), joyKnob = joyEl.querySelector('i'); let joy = null, zoom = TOUCH ? .85 : 1; const ptrs = new Map(); let pinch = null; const JOY_R = 56;
 const ray = new THREE.Raycaster(), gplane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-cv.addEventListener('pointerdown', ev => { if (G.state !== 'play') return; ac(); ptrs.set(ev.pointerId, {x:ev.clientX, y:ev.clientY});
+cv.addEventListener('pointerdown', ev => { if (!(G.state === 'play' || G.state === 'quiz')) return; ac(); if (ev.isPrimary) ptrs.clear();   /* 손을 뗀 기록이 남아 두 손가락 모드로 잘못 들어가 안 움직이던 버그 방지 */
+  ptrs.set(ev.pointerId, {x:ev.clientX, y:ev.clientY});
   if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch = {d:Math.hypot(a.x - b.x, a.y - b.y), z:zoom}; joyReset(); return; }
   joy = {id:ev.pointerId, x0:ev.clientX, y0:ev.clientY, t:performance.now(), active:false}; try { cv.setPointerCapture(ev.pointerId); } catch(e){} });
 cv.addEventListener('pointermove', ev => { if (ptrs.has(ev.pointerId)) ptrs.set(ev.pointerId, {x:ev.clientX, y:ev.clientY});
@@ -498,10 +505,10 @@ cv.addEventListener('pointermove', ev => { if (ptrs.has(ev.pointerId)) ptrs.set(
   robot.mode = 'joy'; robot.mag = k; robot.want = Math.atan2(dx / dist, dy / dist); robot.target = null; });
 function joyEnd(ev){ ptrs.delete(ev.pointerId); if (pinch){ if (ptrs.size < 2) pinch = null; return; } if (!joy || joy.id !== ev.pointerId) return;
   const was = joy.active, moved = Math.hypot(ev.clientX - joy.x0, ev.clientY - joy.y0), dt = performance.now() - joy.t; joyReset();
-  if (!was && moved < 12 && dt < 700 && G.state === 'play'){ const r = cv.getBoundingClientRect(); ray.setFromCamera({x:(ev.clientX - r.left) / r.width * 2 - 1, y:-(ev.clientY - r.top) / r.height * 2 + 1}, camera); const hit = new THREE.Vector3();
+  if (!was && moved < 12 && dt < 700 && (G.state === 'play' || G.state === 'quiz')){ const r = cv.getBoundingClientRect(); ray.setFromCamera({x:(ev.clientX - r.left) / r.width * 2 - 1, y:-(ev.clientY - r.top) / r.height * 2 + 1}, camera); const hit = new THREE.Vector3();
     if (ray.ray.intersectPlane(gplane, hit)){ hit.x = Math.max(-LIMIT, Math.min(LIMIT, hit.x)); hit.z = Math.max(-LIMIT, Math.min(LIMIT, hit.z)); robot.target = hit; robot.mode = 'target'; robot.mag = .8; robot.stuck = 0; tapMark.position.set(hit.x, .2, hit.z); tapMark.scale.setScalar(2.5); tapMark.visible = true; SFX.ping(); } } }
 function joyReset(){ joy = null; joyEl.classList.remove('on'); joyKnob.style.transform = ''; if (robot.mode === 'joy') robot.mode = 'stop'; }
-cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd); window.addEventListener('pointerup', ev => { if (joy && joy.id === ev.pointerId) joyEnd(ev); });
+cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd); window.addEventListener('pointerup', ev => { if (joy && joy.id === ev.pointerId) joyEnd(ev); else ptrs.delete(ev.pointerId); }); window.addEventListener('pointercancel', ev => { ptrs.delete(ev.pointerId); if (joy && joy.id === ev.pointerId) joyReset(); });
 window.addEventListener('blur', joyReset); cv.addEventListener('touchstart', e => e.preventDefault(), {passive:false}); cv.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
 cv.addEventListener('wheel', e => { zoom = Math.max(.55, Math.min(1.8, zoom * (e.deltaY > 0 ? 1.08 : .93))); e.preventDefault(); }, {passive:false});
 const keys = {}; window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; }); window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -515,19 +522,27 @@ function collide(p){ const R = .6 * BIG; for (const o of obstacles){ if (o.r !==
 /* ---------------- 방송국 도착 → 다이얼 돌려 동조 → 문제 → 보물 ---------------- */
 const dial = $('#dial');
 function openStation(st){
-  G.state = 'quiz'; G.cur = st; G.tries = 0; robot.mode = 'stop'; robot.target = null; tapMark.visible = false; joyReset();
+  G.state = 'quiz'; G.cur = st; G.tries = 0; if (robot.mode === 'target'){ robot.mode = 'stop'; robot.target = null; tapMark.visible = false; }
   const qs = st.q[(Math.random() * st.q.length) | 0]; const order = [0, 1, 2, 3].sort(() => Math.random() - .5); G.q = {text:qs[0], opts:order.map(i => qs[1][i]), ans:order.indexOf(0), ex:qs[2]};
   $('#qname').textContent = `${st.e} ${st.name}`; $('#lcdg').textContent = st.fq.toFixed(1) + ' MHz';
   let v = Math.round(st.fq * 10) + (Math.random() < .5 ? -1 : 1) * Math.round(rnd(35, 80)); v = Math.max(880, Math.min(1080, v)); if (Math.abs(v - st.fq * 10) < 25) v = st.fq * 10 > 980 ? 900 : 1060; dial.value = v;
   $('#tuneBox').hidden = false; $('#qBox').hidden = true; $('#qnext').hidden = true; $('#fb').innerHTML = ''; $('#quiz').hidden = false; G.locked = false;
   hush(); curFreq = 'FM ' + st.fq.toFixed(1);
   Tuner.start([523, 659, 784, 659, 587, 698, 880, 698].map(f => f * (st.fq / 98))); onDial();
-  say(`${st.name} 도착! 다이얼을 돌려서 ${st.fq.toFixed(1)}메가헤르츠에 맞춰 줘. 그래야 방송이 들려!`, {quiet:true});
+  say(`${st.name} 도착! 다이얼을 돌려 ${st.fq.toFixed(1)}메가헤르츠에 맞춰 줘. 어려우면 「자동 주파수」 버튼을 눌러!`, {quiet:true});
+  $('#tuneTip').textContent = '다이얼을 돌려 주파수를 맞춰요. 맞을수록 「치지직」 잡음이 줄고 방송 소리가 커져요.';
 }
+/* 자동 동조: 다이얼이 저절로 돌아가 목표 주파수에 맞음 (잡음이 줄고 방송이 커지는 과정을 들려줌) */
+let tuneTimer = null;
+function autoTune(st){ clearInterval(tuneTimer); const start = +dial.value, goal = Math.round(st.fq * 10), t0 = performance.now(), dur = 1700;
+  tuneTimer = setInterval(() => { if (G.cur !== st || G.locked){ clearInterval(tuneTimer); return; } const k = Math.min(1, (performance.now() - t0) / dur); if (k < 0) return;
+    const e = 1 - Math.pow(1 - k, 3); dial.value = Math.round(start + (goal - start) * e); onDial(); if (k >= 1) clearInterval(tuneTimer); }, 40); }
+['pointerdown', 'keydown'].forEach(e => dial.addEventListener(e, () => clearInterval(tuneTimer)));
+$('#autoBtn').onclick = () => { if (!G.cur || G.locked) return; ac(); $('#tuneTip').textContent = '자동 주파수: 다이얼이 저절로 돌아가 방송을 찾는 중이에요…'; autoTune(G.cur); };
 function onDial(){ if (!G.cur || G.locked) return; const v = dial.value / 10, d = Math.abs(v - G.cur.fq); $('#lcdf').textContent = v.toFixed(1);
-  const k = Math.max(0, 1 - d / 4); Tuner.set(k); $('#lcdt').innerHTML = `목표 주파수<br><b>${G.cur.fq.toFixed(1)} MHz</b><br><span class="sb">${[0, 1, 2, 3, 4].map(i => `<i class="${i < Math.round(k * 5) ? 'on' : ''}" style="height:${4 + i * 3}px"></i>`).join('')}</span>`;
+  const k = Math.max(0, 1 - d / 4); Tuner.set(k); $('#lcdt').innerHTML = `목표 주파수<br><b id="lcdg">${G.cur.fq.toFixed(1)} MHz</b><br><span class="sb">${[0, 1, 2, 3, 4].map(i => `<i class="${i < Math.round(k * 5) ? 'on' : ''}" style="height:${4 + i * 3}px"></i>`).join('')}</span>`;
   if (d < .15){ G.locked = true; Tuner.stop(); SFX.lock(); dial.value = Math.round(G.cur.fq * 10); $('#lcdf').textContent = G.cur.fq.toFixed(1);
-    $('#tuneTip').textContent = '동조 성공! 원하는 방송의 전파만 골라 받았어요.'; setTimeout(showQuestion, 450); } }
+    $('#tuneTip').textContent = '동조 성공! 원하는 방송의 전파만 골라 받았어요.'; setTimeout(() => { if (G.cur) showQuestion(); }, 450); } }
 dial.addEventListener('input', onDial);
 const nudge = s => { dial.value = +dial.value + s; onDial(); }; $('#dn').onclick = () => nudge(-1); $('#up').onclick = () => nudge(1);
 let holdT = null; [['#dn', -1], ['#up', 1]].forEach(([id, s]) => { const b = $(id); b.addEventListener('pointerdown', () => { clearInterval(holdT); holdT = setInterval(() => nudge(s), 70); }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(e => b.addEventListener(e, () => clearInterval(holdT))); });
@@ -543,8 +558,10 @@ function answer(i, btn){ if (G.cur.done) return; const st = G.cur;
     say(`딩동댕! 정답이야. ${G.q.ex} 보물 ${st.tr[1]}을 찾았어!`); }
   else { G.tries++; btn.disabled = true; SFX.bad(); const sh = $('#qsheet'); sh.classList.remove('shake'); void sh.offsetWidth; sh.classList.add('shake');
     $('#fb').innerHTML = `<b>치지직! 잡음이 섞였어요.</b> 다시 골라 봐요.`; say('치지직! 잡음이 섞였나 봐. 다시 생각해 볼까?'); } }
-function closeQuiz(){ Tuner.stop(); $('#quiz').hidden = true; const st = G.cur; G.cur = null; G.state = 'play'; if (st) st.cool = true;
-  if (st && st.done){ const n = STATIONS.filter(x => x.done).length; if (G.allDone){ banner('🎉 보물 12개를 모두 모았어요!<br>도시 가운데 보물 금고로 가요!', 4); say('보물을 모두 모았어! 이제 도시 가운데 보물 금고로 가자!'); } else { banner(`${st.tr[0]} ${st.tr[1]} 획득! (${n}/12)`); const nx = nearestTarget(); if (nx) say(`다음 방송국은 ${nx.name}이야. 화살표를 따라가자!`, {quiet:false}); } } }
+function leaveStation(){ if (!G.cur) return; const st = G.cur; clearInterval(tuneTimer); Tuner.stop(); $('#quiz').hidden = true; G.cur = null; G.state = 'play'; st.cool = true; if (!st.done){ hush(); say(`${st.name}에서 멀어졌어. 다시 오면 또 맞춰 줄게!`, {quiet:true}); } else closeAfter(st); }
+function closeQuiz(){ clearInterval(tuneTimer); Tuner.stop(); $('#quiz').hidden = true; const st = G.cur; G.cur = null; G.state = 'play'; if (st) st.cool = true;
+  if (st && st.done) closeAfter(st); }
+function closeAfter(st){ { const n = STATIONS.filter(x => x.done).length; if (G.allDone){ banner('🎉 보물 12개를 모두 모았어요!<br>도시 가운데 보물 금고로 가요!', 4); say('보물을 모두 모았어! 이제 도시 가운데 보물 금고로 가자!'); } else { banner(`${st.tr[0]} ${st.tr[1]} 획득! (${n}/12)`); const nx = nearestTarget(); if (nx) say(`다음 방송국은 ${nx.name}이야. 화살표를 따라가자!`, {quiet:false}); } } }
 $('#qnext').onclick = closeQuiz; $('#qclose').onclick = () => { closeQuiz(); hush(); say('나중에 다시 오자. 주파수는 기억해 둘게!'); };
 
 /* ---------------- 시작 / 끝 ---------------- */
@@ -575,18 +592,19 @@ const camPos = new THREE.Vector3(0, 12, 22), tmp = new THREE.Vector3();
 function toScreen(v){ tmp.copy(v).project(camera); return {x:(tmp.x + 1) / 2 * innerWidth, y:(1 - tmp.y) / 2 * innerHeight, ok:tmp.z < 1 && tmp.z > -1}; }
 function update(dt, el){
   // 키보드 (데스크탑)
-  if (G.state === 'play'){ let kx = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0), kz = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0);
+  if ((G.state === 'play' || G.state === 'quiz')){ let kx = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0), kz = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0);
     if (kx || kz){ robot.mode = 'joy'; robot.mag = .8; robot.want = Math.atan2(kx, kz); robot.target = null; robot.key = true; } else if (robot.key){ robot.key = false; if (robot.mode === 'joy' && !joy) robot.mode = 'stop'; } }
   let moving = false; const before = robot.pos.clone();
-  if (G.state === 'play'){
+  if ((G.state === 'play' || G.state === 'quiz')){
     if (robot.mode === 'joy'){ robot.heading = angleTo(robot.heading, robot.want, dt * 12); if (Math.abs(angleDiff(robot.want, robot.heading)) < 1.2){ robot.pos.addScaledVector(fwdVec(robot.heading), (9 + 13 * robot.mag) * dt); moving = true; } }
     else if (robot.mode === 'target' && robot.target){ const dx = robot.target.x - robot.pos.x, dz = robot.target.z - robot.pos.z, d = Math.hypot(dx, dz);
       if (d < .8){ robot.mode = 'stop'; tapMark.visible = false; } else { robot.want = Math.atan2(dx, dz); robot.heading = angleTo(robot.heading, robot.want, dt * 10); if (Math.abs(angleDiff(robot.want, robot.heading)) < 1.2){ robot.pos.addScaledVector(fwdVec(robot.heading), Math.min(d / dt, 17) * dt); moving = true; } } }
-    collide(robot.pos);
+    collide(robot.pos); collide(robot.pos);   /* 두 번 밀어내 건물 사이에 끼지 않게 */
+    if (G.state === 'quiz' && G.cur && G.cur.marker.distanceTo(robot.pos) > 9) leaveStation();   /* 문제 창이 떠 있어도 걸어서 떠날 수 있음 */
     if (robot.mode === 'target' && moving){ const prog = robot.pos.distanceTo(before); robot.stuck = prog < dt * 2.5 ? (robot.stuck || 0) + dt : 0; if (robot.stuck > .8){ robot.mode = 'stop'; tapMark.visible = false; robot.stuck = 0; say('앗, 건물에 막혔어. 길(도로)로 돌아서 가 볼까?', {quiet:true}); } }
     // 방송국 도착
     STATIONS.forEach(st => { const d = st.marker.distanceTo(robot.pos); if (st.cool && d > 7) st.cool = false;
-      if (!st.done && !st.cool && d < 4.6) openStation(st);
+      if (!st.done && !st.cool && d < 4.6 && G.state === 'play') openStation(st);
       if (!st.done && d < 30 && !G.nearAnnounced.has(st.id) && G.state === 'play'){ G.nearAnnounced.add(st.id); say(`삐빅! ${st.name}의 ${st.fq.toFixed(1)}메가헤르츠 전파가 잡혀요!`); } });
     if (G.allDone && !G.ended && robot.pos.distanceTo(new THREE.Vector3(0, 0, -1.5)) < 7.5){ G.ended = true; SFX.win(); say('황금 라디오다! 전파 박사가 된 걸 축하해!');
       setTimeout(() => { G.state = 'end'; const t = Math.round(el - G.t0); $('#endtxt').innerHTML = `방송국 12곳의 보물을 모두 모았어요!<br>⭐ <b>${G.stars}</b> / 36 · 걸린 시간 ${Math.floor(t / 60)}분 ${t % 60}초<br>전파로 이어진 미래도시를 지켜 줘서 고마워요.`; $('#endScreen').hidden = false; }, 2600); }
@@ -607,9 +625,9 @@ function update(dt, el){
   const spkW = new THREE.Vector3(); robot.spk.getWorldPosition(spkW); const fw = fwdVec(robot.heading);
   soundRings.forEach(w => { w.k = (w.k + dt * 1.4) % 1; w.r.position.copy(spkW).addScaledVector(fw, (.2 + w.k * 1.6) * BIG); w.r.rotation.set(0, robot.heading, Math.PI * .55); w.r.scale.setScalar((.6 + w.k * 1.6) * BIG); w.r.material.opacity = talking ? (1 - w.k) * .9 : 0; });
   robot.spk.scale.z = talking ? 1 + Math.abs(Math.sin(el * 30)) * .8 : 1; robot.spkCap.position.z = talking ? .04 + Math.abs(Math.sin(el * 30)) * .04 : .04;
-  if (el > bubbleUntil || G.state === 'quiz') $('#bubble').hidden = true; else { const s = toScreen(robot.g.position.clone().add(new THREE.Vector3(0, 4.2 * BIG, 0))); const b = $('#bubble'); b.style.left = Math.max(170, Math.min(innerWidth - 170, s.x)) + 'px'; b.style.top = Math.max(110, s.y) + 'px'; }
+  if (el > bubbleUntil || (G.state === 'quiz' && innerWidth < 640)) $('#bubble').hidden = true; else { const s = toScreen(robot.g.position.clone().add(new THREE.Vector3(0, 4.2 * BIG, 0))); const b = $('#bubble'); b.style.left = Math.max(170, Math.min(innerWidth - 170, s.x)) + 'px'; b.style.top = Math.max(110, s.y) + 'px'; }
   // 카메라
-  camPos.set(robot.g.position.x, 30 * zoom + 4, robot.g.position.z + 25 * zoom); camera.position.lerp(camPos, Math.min(1, dt * 5)); camera.lookAt(robot.g.position.x, 4, robot.g.position.z - 7 * zoom);
+  camPos.set(robot.g.position.x, 30 * zoom + 4, robot.g.position.z + 25 * zoom); camera.position.lerp(camPos, Math.min(1, dt * 5)); const qShift = (G.state === 'quiz' && innerWidth < 640) ? 16 : 0; camera.lookAt(robot.g.position.x, 4, robot.g.position.z - 7 * zoom + qShift);
   sun.position.set(robot.pos.x + 30, 55, robot.pos.z + 18); sun.target.position.copy(robot.pos);
   // 안내 화살표 · 전파 세기
   const nt = nearestTarget(); if (nt && G.state === 'play'){ const d = nt.p.distanceTo(robot.pos); guide.visible = d > 3.5; guide.position.set(robot.g.position.x, .25, robot.g.position.z); guide.scale.setScalar(2.2); guide.rotation.y = Math.atan2(nt.p.x - robot.pos.x, nt.p.z - robot.pos.z);
